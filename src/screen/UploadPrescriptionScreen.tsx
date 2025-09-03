@@ -1,15 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  Alert,
+} from 'react-native';
 import { useTheme } from '../theme';
-import { Camera, Image as ImageIcon, Upload, X, CheckCircle, AlertCircle } from 'lucide-react-native';
+import {
+  Camera,
+  Image as ImageIcon,
+  Upload,
+  X,
+  CheckCircle,
+  AlertCircle,
+} from 'lucide-react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import DocumentScanner, { ResponseType } from 'react-native-document-scanner-plugin';
+import DocumentScanner, {
+  ResponseType,
+} from 'react-native-document-scanner-plugin';
 import Header from '../components/Header';
 import PrescriptionGallery from '../components/PrescriptionGallery';
 import { createOrder, updateOrder } from '../api/orders';
 import { showToast } from '../utils/toast';
 
-const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
+import { PermissionsAndroid, Platform } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
+
+export const requestGalleryPermission = async () => {
+  if (Platform.OS === 'android') {
+    try {
+      if (Platform.Version >= 33) {
+        // Android 13+
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } else {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      }
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  }
+  return true;
+};
+
+const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({
+  navigation,
+  route,
+}) => {
   const { colors } = useTheme();
   const [doctor, setDoctor] = useState('');
   const [referral, setReferral] = useState('');
@@ -33,8 +80,16 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
   // Populate form with existing data if editing
   useEffect(() => {
     if (route.params) {
-      const { doctor: editDoctor, referral: editReferral, coupon: editCoupon, patient: editPatient, hospital: editHospital, image: editImage, orderId: editOrderId } = route.params;
-      
+      const {
+        doctor: editDoctor,
+        referral: editReferral,
+        coupon: editCoupon,
+        patient: editPatient,
+        hospital: editHospital,
+        image: editImage,
+        orderId: editOrderId,
+      } = route.params;
+
       if (editDoctor) {
         setDoctor(editDoctor);
         setIsEditing(true);
@@ -63,6 +118,8 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
         croppedImageQuality: 0.8,
       });
       if (scannedImages && scannedImages.length > 0) {
+        console.log('scannedImages  ', scannedImages);
+
         setImage(scannedImages[0]);
         if (errors.image) setErrors(prev => ({ ...prev, image: undefined }));
       }
@@ -73,29 +130,39 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
 
   const scanFromGallery = async () => {
     try {
-      const { scannedImages } = await DocumentScanner.scanDocument({
-        responseType: ResponseType.ImageFilePath,
-        maxNumDocuments: 1,
-        croppedImageQuality: 0.8,
-      });
-      if (scannedImages && scannedImages.length > 0) {
-        setImage(scannedImages[0]);
-        if (errors.image) setErrors(prev => ({ ...prev, image: undefined }));
+      const hasPermission = await requestGalleryPermission();
+      if (!hasPermission) {
+        Alert.alert('Gallery permission denied');
+        return;
       }
+      launchImageLibrary(
+        {
+          mediaType: 'photo',
+          quality: 0.8,
+          selectionLimit: 1,
+        },
+        response => {
+          if (response.didCancel) {
+            console.log('User cancelled image picker');
+          } else if (response.errorCode) {
+            console.log('Image Picker Error: ', response.errorMessage);
+          } else if (response.assets && response.assets.length > 0) {
+            response?.assets[0]?.uri && setImage(response.assets[0].uri);
+            if (errors.image)
+              setErrors(prev => ({ ...prev, image: undefined }));
+          }
+        },
+      );
     } catch (e) {
       // handle cancel or error
     }
   };
 
   const removeImage = () => {
-    Alert.alert(
-      'Remove Image',
-      'Are you sure you want to remove this image?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => setImage(null) }
-      ]
-    );
+    Alert.alert('Remove Image', 'Are you sure you want to remove this image?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => setImage(null) },
+    ]);
   };
 
   const openGallery = () => {
@@ -112,9 +179,9 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
     // Validation on submit click
     let newErrors: typeof errors = {};
     if (!doctor.trim()) newErrors.doctor = "Doctor's name is required";
-    if (!patient.trim()) newErrors.patient = "Patient name is required";
-    if (!hospital.trim()) newErrors.hospital = "Hospital address is required";
-    if (!image) newErrors.image = "Prescription photo is required";
+    if (!patient.trim()) newErrors.patient = 'Patient name is required';
+    if (!hospital.trim()) newErrors.hospital = 'Hospital address is required';
+    if (!image) newErrors.image = 'Prescription photo is required';
 
     setErrors(newErrors);
 
@@ -160,7 +227,7 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
     onChangeText: (text: string) => void,
     placeholder: string,
     error?: string,
-    isRequired: boolean = false
+    isRequired: boolean = false,
   ) => (
     <View style={styles.inputContainer}>
       <Text style={[styles.label, { color: colors.text }]}>
@@ -169,16 +236,20 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
       <TextInput
         style={[
           styles.input,
-          { 
-            color: colors.text, 
+          {
+            color: colors.text,
             borderColor: error ? colors.error : colors.border,
-            backgroundColor: colors.surface
-          }
+            backgroundColor: colors.surface,
+          },
         ]}
         value={value}
         onChangeText={text => {
           onChangeText(text);
-          if (error) setErrors(prev => ({ ...prev, [label.toLowerCase().replace(/\s+/g, '')]: undefined }));
+          if (error)
+            setErrors(prev => ({
+              ...prev,
+              [label.toLowerCase().replace(/\s+/g, '')]: undefined,
+            }));
         }}
         placeholder={placeholder}
         placeholderTextColor={colors.placeholder}
@@ -196,18 +267,17 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header 
-        title={isEditing ? "Edit Order" : "Create Order"} 
-        onBack={() => navigation.goBack()} 
-        color={colors.text} 
-        backgroundColor={colors.background} 
+      <Header
+        title={isEditing ? 'Edit Order' : 'Create Order'}
+        onBack={() => navigation.goBack()}
+        color={colors.text}
+        backgroundColor={colors.background}
       />
-      <KeyboardAwareScrollView 
-        contentContainerStyle={styles.container} 
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        
         {/* Form Section */}
         <View style={styles.formSection}>
           {renderInputField(
@@ -216,43 +286,43 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
             setDoctor,
             "Enter doctor's name",
             errors.doctor,
-            true
+            true,
           )}
 
           {renderInputField(
-            "Patient Name",
+            'Patient Name',
             patient,
             setPatient,
-            "Enter patient name",
+            'Enter patient name',
             errors.patient,
-            true
+            true,
           )}
 
           {renderInputField(
-            "Hospital Address",
+            'Hospital Address',
             hospital,
             setHospital,
-            "Enter hospital address",
+            'Enter hospital address',
             errors.hospital,
-            true
+            true,
           )}
 
           {renderInputField(
-            "Referral Name",
+            'Referral Name',
             referral,
             setReferral,
-            "Enter referral name (optional)",
+            'Enter referral name (optional)',
             undefined,
-            false
+            false,
           )}
 
           {renderInputField(
-            "Coupon Code",
+            'Coupon Code',
             coupon,
             setCoupon,
-            "Enter coupon code (optional)",
+            'Enter coupon code (optional)',
             undefined,
-            false
+            false,
           )}
         </View>
 
@@ -261,46 +331,77 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Prescription Photo <Text style={{ color: colors.error }}>*</Text>
           </Text>
-          
+
           {!image ? (
-            <View style={[styles.uploadContainer, { backgroundColor: colors.surface }]}>
+            <View
+              style={[
+                styles.uploadContainer,
+                { backgroundColor: colors.surface },
+              ]}
+            >
               <Upload color={colors.primary} size={24} />
               <Text style={[styles.uploadTitle, { color: colors.text }]}>
                 Upload Prescription
               </Text>
-              
+
               <View style={styles.uploadButtons}>
-                <TouchableOpacity 
-                  style={[styles.uploadButton, { backgroundColor: colors.primary }]} 
+                <TouchableOpacity
+                  style={[
+                    styles.uploadButton,
+                    { backgroundColor: colors.primary },
+                  ]}
                   onPress={scanFromCamera}
                 >
                   <Camera color={colors.onPrimary} size={16} />
-                  <Text style={[styles.uploadButtonText, { color: colors.onPrimary }]}>
+                  <Text
+                    style={[
+                      styles.uploadButtonText,
+                      { color: colors.onPrimary },
+                    ]}
+                  >
                     Camera
                   </Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.uploadButton, { backgroundColor: colors.primary }]} 
+
+                <TouchableOpacity
+                  style={[
+                    styles.uploadButton,
+                    { backgroundColor: colors.primary },
+                  ]}
                   onPress={scanFromGallery}
                 >
                   <ImageIcon color={colors.onPrimary} size={16} />
-                  <Text style={[styles.uploadButtonText, { color: colors.onPrimary }]}>
+                  <Text
+                    style={[
+                      styles.uploadButtonText,
+                      { color: colors.onPrimary },
+                    ]}
+                  >
                     Gallery
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
-            <View style={[styles.imagePreviewContainer, { backgroundColor: colors.surface }]}>
+            <View
+              style={[
+                styles.imagePreviewContainer,
+                { backgroundColor: colors.surface },
+              ]}
+            >
               <View style={styles.imagePreviewHeader}>
                 <View style={styles.imagePreviewInfo}>
                   <CheckCircle color={colors.primary} size={16} />
-                  <Text style={[styles.imagePreviewTitle, { color: colors.text }]}>
+                  <Text
+                    style={[styles.imagePreviewTitle, { color: colors.text }]}
+                  >
                     Image Uploaded
                   </Text>
                 </View>
-                <TouchableOpacity onPress={removeImage} style={styles.removeButton}>
+                <TouchableOpacity
+                  onPress={removeImage}
+                  style={styles.removeButton}
+                >
                   <X color={colors.error} size={16} />
                 </TouchableOpacity>
               </View>
@@ -309,7 +410,7 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
               </TouchableOpacity>
             </View>
           )}
-          
+
           {errors.image && (
             <View style={styles.errorContainer}>
               <AlertCircle color={colors.error} size={12} />
@@ -322,23 +423,28 @@ const UploadPrescriptionScreen: React.FC<{ navigation: any; route: any }> = ({ n
 
         {/* Submit Button */}
         <View style={styles.submitSection}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.submitButton, 
-              { 
-                backgroundColor: isSubmitting ? colors.placeholder : colors.primary,
-                opacity: isSubmitting ? 0.7 : 1
-              }
+              styles.submitButton,
+              {
+                backgroundColor: isSubmitting
+                  ? colors.placeholder
+                  : colors.primary,
+                opacity: isSubmitting ? 0.7 : 1,
+              },
             ]}
             onPress={uploadPrescription}
             disabled={isSubmitting}
           >
             <Text style={[styles.submitText, { color: colors.onPrimary }]}>
-              {isSubmitting ? 'Processing...' : (isEditing ? 'Update Order' : 'Submit Order')}
+              {isSubmitting
+                ? 'Processing...'
+                : isEditing
+                ? 'Update Order'
+                : 'Submit Order'}
             </Text>
           </TouchableOpacity>
         </View>
-
       </KeyboardAwareScrollView>
 
       {/* Prescription Gallery Modal */}
@@ -479,4 +585,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default UploadPrescriptionScreen; 
+export default UploadPrescriptionScreen;

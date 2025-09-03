@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { Text, StyleSheet, TouchableOpacity, View, TextStyle, ViewStyle, StyleSheet as RNStyleSheet } from 'react-native';
+import {
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  TextStyle,
+  ViewStyle,
+  StyleSheet as RNStyleSheet,
+} from 'react-native';
 import { Button, PhoneInput } from '../components';
 import { useTheme } from '../theme';
 import { useNavigation } from '@react-navigation/native';
@@ -34,11 +42,13 @@ const LoginScreen: React.FC = () => {
     setLoading(true);
     setError(undefined);
     try {
-      const data = await loginUser({ phone:`+91${phone}`, dev: DevMode });
+      const data = await loginUser({ phone: `+91${phone}`, dev: DevMode });
       // Handle successful login (e.g., save token, navigate)
       navigation.navigate(SCREENS.VERIFY_OTP, { phone: `+91${phone}` });
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Login failed. Please try again.');
+      setError(
+        err?.response?.data?.message || 'Login failed. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -55,8 +65,12 @@ const LoginScreen: React.FC = () => {
         <View style={[styles.root, { backgroundColor: colors.background }]}>
           {/* Main Content */}
           <View style={styles.centerContent}>
-            <Text style={[styles.title, { color: colors.text }]}>{CONTENT.UI.WELCOME_TITLE}</Text>
-            <Text style={[styles.subtitle, { color: colors.placeholder }]}>{CONTENT.UI.LOGIN_SUBTITLE}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {CONTENT.UI.WELCOME_TITLE}
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.placeholder }]}>
+              {CONTENT.UI.LOGIN_SUBTITLE}
+            </Text>
             <PhoneInput
               value={phone}
               onChangeText={setPhone}
@@ -64,17 +78,42 @@ const LoginScreen: React.FC = () => {
               placeholder="00 0000 0000"
             />
             {error ? (
-              <Text style={{ color: colors.error, marginTop: -8, marginBottom: 8, marginLeft: 4, fontSize: 14 }}>{error}</Text>
+              <Text
+                style={{
+                  color: colors.error,
+                  marginTop: -8,
+                  marginBottom: 8,
+                  marginLeft: 4,
+                  fontSize: 14,
+                }}
+              >
+                {error}
+              </Text>
             ) : null}
             <Button
               title={loading ? CONTENT.UI.SIGNING_IN : CONTENT.UI.SIGNIN}
               onPress={onLogin}
               disabled={loading}
-              style={RNStyleSheet.flatten([styles.signinBtn, { backgroundColor: colors.primary, shadowColor: colors.primary }]) as ViewStyle}
-              textStyle={RNStyleSheet.flatten([styles.signinBtnText, { color: colors.onPrimary }]) as TextStyle}
+              style={
+                RNStyleSheet.flatten([
+                  styles.signinBtn,
+                  {
+                    backgroundColor: colors.primary,
+                    shadowColor: colors.primary,
+                  },
+                ]) as ViewStyle
+              }
+              textStyle={
+                RNStyleSheet.flatten([
+                  styles.signinBtnText,
+                  { color: colors.onPrimary },
+                ]) as TextStyle
+              }
             />
             <TouchableOpacity style={styles.helpContainer}>
-              <Text style={[styles.helpText, { color: colors.error }]}>{CONTENT.UI.HELP}</Text>
+              <Text style={[styles.helpText, { color: colors.error }]}>
+                {CONTENT.UI.HELP}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -155,4 +194,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen; 
+export default LoginScreen;

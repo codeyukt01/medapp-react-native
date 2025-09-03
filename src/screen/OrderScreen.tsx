@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  TouchableOpacity,
+  TextInput,
+} from 'react-native';
 import { useTheme } from '../theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -22,62 +30,67 @@ const OrderScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
-  
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+
   // Infinite scroll settings
   const [currentIndex, setCurrentIndex] = useState(0);
   const batchSize = 10; // Load 10 orders at a time
 
   // Function to get all orders via API
-  const fetchOrdersViaAPI = async () => {
+  const fetchOrdersViaAPI = async (page: number) => {
     try {
-      console.log('OrderScreen: Fetching all orders via API...');
-      const response = await getOrders();
-      console.log('OrderScreen: API response:', response);
-      
+      if (page !== 1 && page > totalPages) {
+        return;
+      }
+      const response = await getOrders({
+        params: { page },
+      });
+      setTotalPages(response.pages);
+      setTotalRecords(response.total);
+
       // Handle the response - it could be direct array or nested in data property
       const allOrdersData = response.data || response || [];
-      setAllOrders(allOrdersData);
-      
-      // Initially display first batch
-      const initialBatch = allOrdersData.slice(0, batchSize);
-      setDisplayedOrders(initialBatch);
+      setAllOrders([...allOrders, ...allOrdersData]);
+      setDisplayedOrders([...allOrders, ...allOrdersData]);
       setCurrentIndex(batchSize);
-      
+
       setLoading(false);
-      console.log('OrderScreen: Total orders loaded:', allOrdersData.length);
-      console.log('OrderScreen: Initially displaying:', initialBatch.length);
+      setLoadingMore(false);
     } catch (error) {
       console.error('OrderScreen: Error fetching orders via API:', error);
       setAllOrders([]);
       setDisplayedOrders([]);
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   // Load more orders for infinite scroll
   const loadMoreOrders = async () => {
-    if (loadingMore || currentIndex >= allOrders.length) {
-      console.log('LoadMore: Skipping - loadingMore:', loadingMore, 'currentIndex:', currentIndex, 'total:', allOrders.length);
+    if (loadingMore || page === totalPages) {
+      console.log(
+        'LoadMore: Skipping - loadingMore:',
+        loadingMore,
+        'currentIndex:',
+        currentIndex,
+        'total:',
+        allOrders.length,
+      );
       return;
     }
 
     console.log('LoadMore: Loading more orders from index:', currentIndex);
     setLoadingMore(true);
-
-    // Simulate API delay for better UX
-    setTimeout(() => {
-      const nextBatch = allOrders.slice(currentIndex, currentIndex + batchSize);
-      setDisplayedOrders(prev => [...prev, ...nextBatch]);
-      setCurrentIndex(prev => prev + batchSize);
-      setLoadingMore(false);
-      console.log('LoadMore: Loaded batch of:', nextBatch.length, 'orders. Total displayed:', displayedOrders.length + nextBatch.length);
-    }, 500);
+    setPage(page + 1);
+    fetchOrdersViaAPI(page + 1);
   };
 
   // Load orders on component mount
   useEffect(() => {
     console.log('OrderScreen: Component mounted, fetching orders...');
-    fetchOrdersViaAPI();
+    fetchOrdersViaAPI(page);
   }, []);
 
   const onRefresh = async () => {
@@ -90,13 +103,14 @@ const OrderScreen: React.FC = () => {
   // Filter orders based on search term
   const filterOrders = (orders: any[], search: string) => {
     if (!search.trim()) return orders;
-    
+
     const lowerSearch = search.toLowerCase();
-    return orders.filter(order => 
-      order.patientName?.toLowerCase().includes(lowerSearch) ||
-      order.doctorName?.toLowerCase().includes(lowerSearch) ||
-      order.orderid?.toLowerCase().includes(lowerSearch) ||
-      order.status?.toLowerCase().includes(lowerSearch)
+    return orders.filter(
+      order =>
+        order.patientName?.toLowerCase().includes(lowerSearch) ||
+        order.doctorName?.toLowerCase().includes(lowerSearch) ||
+        order.orderid?.toLowerCase().includes(lowerSearch) ||
+        order.status?.toLowerCase().includes(lowerSearch),
     );
   };
 
@@ -107,7 +121,7 @@ const OrderScreen: React.FC = () => {
   }, [displayedOrders, searchTerm]);
 
   const renderOrder = ({ item }: { item: any }) => (
-   <OrderCard order={item} statusColors={statusColors} colors={colors} />
+    <OrderCard order={item} statusColors={statusColors} colors={colors} />
   );
 
   const renderFooter = () => {
@@ -115,13 +129,15 @@ const OrderScreen: React.FC = () => {
       return (
         <View style={styles.loadingMore}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={[styles.loadingMoreText, { color: colors.textSecondary }]}>
+          <Text
+            style={[styles.loadingMoreText, { color: colors.textSecondary }]}
+          >
             Loading more orders...
           </Text>
         </View>
       );
     }
-    
+
     if (currentIndex >= allOrders.length && allOrders.length > 0) {
       return (
         <View style={styles.endOfList}>
@@ -131,16 +147,21 @@ const OrderScreen: React.FC = () => {
         </View>
       );
     }
-    
+
     return null;
   };
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>All Orders</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        All Orders
+      </Text>
       {allOrders.length > 0 && (
         <Text style={[styles.orderCount, { color: colors.textSecondary }]}>
-          {searchTerm ? `${filteredOrders.length} of ${displayedOrders.length}` : `${displayedOrders.length} of ${allOrders.length}`} order{allOrders.length !== 1 ? 's' : ''}
+          {searchTerm
+            ? `${filteredOrders.length} of ${displayedOrders.length}`
+            : `${displayedOrders.length} of ${allOrders.length}`}{' '}
+          order{allOrders.length !== 1 ? 's' : ''}
         </Text>
       )}
     </View>
@@ -151,27 +172,32 @@ const OrderScreen: React.FC = () => {
       <LogoHeader title="Orders" />
       <View style={{ flex: 1, paddingHorizontal: 20 }}>
         {renderHeader()}
-        
+
         {/* Debug Info - Remove this in production */}
         <View style={styles.debugContainer}>
           <Text style={[styles.debugText, { color: colors.textSecondary }]}>
-            Debug: Total {allOrders.length}, Displayed {displayedOrders.length}, Index {currentIndex}
+            Debug: Total {allOrders.length}, Displayed {displayedOrders.length},
+            Index {currentIndex}
           </Text>
           <Text style={[styles.debugText, { color: colors.textSecondary }]}>
-            Has More: {currentIndex < allOrders.length ? 'Yes' : 'No'}, Loading: {loadingMore ? 'Yes' : 'No'}
+            Has More: {currentIndex < allOrders.length ? 'Yes' : 'No'}, Loading:{' '}
+            {loadingMore ? 'Yes' : 'No'}
           </Text>
         </View>
-        
+
         {/* Search Input */}
         <View style={styles.searchContainer}>
           <View style={styles.searchInputContainer}>
             <TextInput
-              style={[styles.searchInput, { 
-                backgroundColor: colors.inputBackground,
-                borderColor: colors.border,
-                color: colors.text,
-                flex: 1
-              }]}
+              style={[
+                styles.searchInput,
+                {
+                  backgroundColor: colors.inputBackground,
+                  borderColor: colors.border,
+                  color: colors.text,
+                  flex: 1,
+                },
+              ]}
               placeholder="Search orders by patient, doctor, or order ID..."
               placeholderTextColor={colors.placeholder}
               value={searchTerm}
@@ -182,23 +208,32 @@ const OrderScreen: React.FC = () => {
                 style={styles.clearSearchButton}
                 onPress={() => setSearchTerm('')}
               >
-                <Text style={[styles.clearSearchText, { color: colors.textSecondary }]}>✕</Text>
+                <Text
+                  style={[
+                    styles.clearSearchText,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  ✕
+                </Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
-        
+
         {loading && !refreshing ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : displayedOrders.length === 0 ? (
-          <EmptyView
-            title="No Orders Yet"
-          />
+          <EmptyView title="No Orders Yet" />
         ) : searchTerm && filteredOrders.length === 0 ? (
           <View style={styles.noResultsContainer}>
-            <Text style={[styles.noResultsText, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.noResultsText, { color: colors.textSecondary }]}
+            >
               No orders found matching "{searchTerm}"
             </Text>
             <TouchableOpacity
@@ -228,20 +263,32 @@ const OrderScreen: React.FC = () => {
               onEndReachedThreshold={0.5}
               ListFooterComponent={renderFooter}
             />
-            
+
             {/* Manual Load More Button */}
-            {!searchTerm && currentIndex < allOrders.length && !loadingMore && (
-              <View style={styles.loadMoreButtonContainer}>
-                <TouchableOpacity
-                  style={[styles.loadMoreButton, { backgroundColor: colors.primary }]}
-                  onPress={loadMoreOrders}
-                >
-                  <Text style={[styles.loadMoreButtonText, { color: colors.onPrimary }]}>
-                    Load More Orders ({allOrders.length - currentIndex} remaining)
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            {!searchTerm &&
+              allOrders.length > 0 &&
+              page < totalPages &&
+              !loadingMore && (
+                <View style={styles.loadMoreButtonContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.loadMoreButton,
+                      { backgroundColor: colors.primary },
+                    ]}
+                    onPress={loadMoreOrders}
+                  >
+                    <Text
+                      style={[
+                        styles.loadMoreButtonText,
+                        { color: colors.onPrimary },
+                      ]}
+                    >
+                      Load More Orders ({totalRecords - allOrders.length}{' '}
+                      remaining)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
           </View>
         )}
       </View>
@@ -341,4 +388,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OrderScreen; 
+export default OrderScreen;
